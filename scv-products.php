@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: SCV Products
- * Description: Custom Product post type, Collections taxonomy, and Always Available product cards block for SoCal VoCals Swag.
- * Version: 1.0.9
+ * Description: Custom Product post type, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
+ * Version: 1.1.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: SoCal VoCals Swag
@@ -13,8 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('SCV_PRODUCTS_VER', '1.0.9');
-// Updater test release.
+define('SCV_PRODUCTS_VER', '1.1.0');
 define('SCV_PRODUCTS_PATH', plugin_dir_path(__FILE__));
 define('SCV_PRODUCTS_URL', plugin_dir_url(__FILE__));
 define(
@@ -62,6 +61,39 @@ function scv_products_register_types() {
         'show_in_rest'      => true,
     ]);
 
+    register_taxonomy('scv_category', ['scv_product'], [
+        'labels' => [
+            'name'              => 'Categories',
+            'singular_name'     => 'Category',
+            'search_items'      => 'Search Categories',
+            'all_items'         => 'All Categories',
+            'edit_item'         => 'Edit Category',
+            'update_item'       => 'Update Category',
+            'add_new_item'      => 'Add New Category',
+            'new_item_name'     => 'New Category Name',
+            'menu_name'         => 'Categories',
+        ],
+        'hierarchical'       => true,
+        'public'             => false,
+        'publicly_queryable' => false,
+        'show_ui'            => true,
+        'show_admin_column'  => true,
+        'show_in_nav_menus'  => false,
+        'show_tagcloud'      => false,
+        'rewrite'            => false,
+        'show_in_rest'       => true,
+        'rest_base'          => 'scv-categories',
+    ]);
+
+    register_term_meta('scv_category', '_scv_category_order', [
+        'type'              => 'integer',
+        'single'            => true,
+        'default'           => 10,
+        'sanitize_callback' => 'scv_products_sanitize_int',
+        'auth_callback'     => function () { return current_user_can('manage_categories'); },
+        'show_in_rest'      => true,
+    ]);
+
     register_post_type('scv_product', [
         'labels' => [
             'name'               => 'Products',
@@ -90,7 +122,7 @@ function scv_products_register_types() {
         'menu_position'       => 25,
         'menu_icon'           => 'dashicons-store',
         'supports'            => ['title', 'custom-fields'],
-        'taxonomies'          => ['scv_collection'],
+        'taxonomies'          => ['scv_collection', 'scv_category'],
         'show_in_rest'        => true,
         'rest_base'           => 'scv-products',
     ]);
@@ -318,6 +350,59 @@ add_filter('manage_edit-scv_collection_columns', function ($cols) {
 add_filter('manage_scv_collection_custom_column', function ($out, $col, $term_id) {
     if ($col === 'scv_order') {
         $val = get_term_meta($term_id, '_scv_collection_order', true);
+        return $val === '' ? '10' : esc_html((string) (int) $val);
+    }
+    return $out;
+}, 10, 3);
+
+/* --------------------------------------------------------------------------
+ * Category order field in wp-admin
+ * -------------------------------------------------------------------------- */
+
+add_action('scv_category_add_form_fields', function () {
+    ?>
+    <div class="form-field">
+        <label for="scv-category-order">Display Order</label>
+        <input type="number" name="scv_category_order" id="scv-category-order" value="10" step="1" style="width: 100px;">
+        <p class="description">Lower numbers appear first on the page (e.g. Sweatshirts &amp; Hoodies = 10, Hats = 20).</p>
+    </div>
+    <?php
+});
+
+add_action('scv_category_edit_form_fields', function ($term) {
+    $order = (int) get_term_meta($term->term_id, '_scv_category_order', true);
+    if ($order === 0 && !metadata_exists('term', $term->term_id, '_scv_category_order')) {
+        $order = 10;
+    }
+    ?>
+    <tr class="form-field">
+        <th scope="row"><label for="scv-category-order">Display Order</label></th>
+        <td>
+            <input type="number" name="scv_category_order" id="scv-category-order" value="<?php echo esc_attr($order); ?>" step="1" style="width: 100px;">
+            <p class="description">Lower numbers appear first on the page.</p>
+        </td>
+    </tr>
+    <?php
+});
+
+function scv_products_save_category_order($term_id) {
+    if (!current_user_can('manage_categories')) {
+        return;
+    }
+    if (isset($_POST['scv_category_order'])) {
+        update_term_meta($term_id, '_scv_category_order', (int) $_POST['scv_category_order']);
+    }
+}
+add_action('created_scv_category', 'scv_products_save_category_order');
+add_action('edited_scv_category', 'scv_products_save_category_order');
+
+add_filter('manage_edit-scv_category_columns', function ($cols) {
+    $cols['scv_order'] = 'Order';
+    return $cols;
+});
+add_filter('manage_scv_category_custom_column', function ($out, $col, $term_id) {
+    if ($col === 'scv_order') {
+        $val = get_term_meta($term_id, '_scv_category_order', true);
         return $val === '' ? '10' : esc_html((string) (int) $val);
     }
     return $out;
@@ -1079,26 +1164,26 @@ function scv_products_render($attrs = []) {
             'cards'        => [],
         ];
     }
-    $uncollected_cards = [];
-
-    foreach ($posts as $p) {
-        $card_html = scv_products_render_card($p, $show_count_pill);
-        if ($card_html === '') {
-            continue;
-        }
-        $p_terms = get_the_terms($p->ID, 'scv_collection');
-        if (is_array($p_terms) && !empty($p_terms)) {
-            foreach ($p_terms as $pt) {
-                if (isset($groups[$pt->term_id])) {
-                    $groups[$pt->term_id]['cards'][] = $card_html;
-                }
-            }
-        } elseif ($collection_filter === '') {
-            $uncollected_cards[] = $card_html;
-        }
-    }
 
     if (!$collection_nav) {
+        $uncollected_cards = [];
+        foreach ($posts as $p) {
+            $card_html = scv_products_render_card($p, $show_count_pill);
+            if ($card_html === '') {
+                continue;
+            }
+            $p_terms = get_the_terms($p->ID, 'scv_collection');
+            if (is_array($p_terms) && !empty($p_terms)) {
+                foreach ($p_terms as $pt) {
+                    if (isset($groups[$pt->term_id])) {
+                        $groups[$pt->term_id]['cards'][] = $card_html;
+                    }
+                }
+            } elseif ($collection_filter === '') {
+                $uncollected_cards[] = $card_html;
+            }
+        }
+
         $rendered_groups = [];
         foreach ($groups as $g) {
             if (!empty($g['cards'])) {
@@ -1132,40 +1217,169 @@ function scv_products_render($attrs = []) {
         return ob_get_clean();
     }
 
-    $master_groups = [];
-    $more_gear_cards = [];
-    foreach ($groups as $g) {
-        if (empty($g['cards'])) {
-            continue;
-        }
-        if (!empty($g['is_more_gear'])) {
-            foreach ($g['cards'] as $c) {
-                $more_gear_cards[] = $c;
-            }
-        } else {
-            $master_groups[] = $g;
-        }
+    $category_terms = get_terms([
+        'taxonomy'   => 'scv_category',
+        'hide_empty' => true,
+    ]);
+    if (is_wp_error($category_terms)) {
+        $category_terms = [];
     }
-    foreach ($uncollected_cards as $c) {
-        $more_gear_cards[] = $c;
+    usort($category_terms, function ($a, $b) {
+        $oa = get_term_meta($a->term_id, '_scv_category_order', true);
+        $ob = get_term_meta($b->term_id, '_scv_category_order', true);
+        $ia = ($oa === '') ? 100 : (int) $oa;
+        $ib = ($ob === '') ? 100 : (int) $ob;
+        if ($ia !== $ib) {
+            return $ia <=> $ib;
+        }
+        return strcasecmp($a->name, $b->name);
+    });
+
+    $category_sections = [];
+    $master_cat_id = 0;
+    foreach ($category_terms as $ct) {
+        $cat_groups = [];
+        foreach ($groups as $cid => $g) {
+            if (!empty($g['is_more_gear'])) {
+                continue;
+            }
+            $cat_groups[$cid] = $g;
+        }
+        $category_sections[(int) $ct->term_id] = [
+            'term_id' => (int) $ct->term_id,
+            'slug'    => (string) $ct->slug,
+            'heading' => (string) $ct->name,
+            'groups'  => $cat_groups,
+        ];
+        if ($master_cat_id === 0 && strcasecmp(trim((string) $ct->name), trim($master_heading)) === 0) {
+            $master_cat_id = (int) $ct->term_id;
+        }
     }
 
-    if (empty($master_groups) && empty($more_gear_cards)) {
+    $fallback_groups = [];
+    foreach ($groups as $cid => $g) {
+        if (!empty($g['is_more_gear'])) {
+            continue;
+        }
+        $fallback_groups[$cid] = $g;
+    }
+
+    $more_gear_cards = [];
+    foreach ($posts as $p) {
+        $card_html = scv_products_render_card($p, $show_count_pill);
+        if ($card_html === '') {
+            continue;
+        }
+        $p_colls = get_the_terms($p->ID, 'scv_collection');
+        if (is_wp_error($p_colls) || !is_array($p_colls) || empty($p_colls)) {
+            $more_gear_cards[] = $card_html;
+            continue;
+        }
+
+        $non_more_colls = [];
+        $in_more_gear = false;
+        foreach ($p_colls as $pt) {
+            if (scv_products_is_more_gear_term($pt)) {
+                $in_more_gear = true;
+            } elseif (isset($groups[$pt->term_id])) {
+                $non_more_colls[] = $pt;
+            }
+        }
+        if ($in_more_gear) {
+            $more_gear_cards[] = $card_html;
+        }
+        if (empty($non_more_colls)) {
+            continue;
+        }
+
+        $p_cats = get_the_terms($p->ID, 'scv_category');
+        $valid_cats = [];
+        if (is_array($p_cats) && !empty($p_cats)) {
+            foreach ($p_cats as $pc) {
+                if (isset($category_sections[(int) $pc->term_id])) {
+                    $valid_cats[] = (int) $pc->term_id;
+                }
+            }
+        }
+
+        if (!empty($valid_cats)) {
+            foreach ($valid_cats as $cat_id) {
+                foreach ($non_more_colls as $pt) {
+                    if (isset($category_sections[$cat_id]['groups'][$pt->term_id])) {
+                        $category_sections[$cat_id]['groups'][$pt->term_id]['cards'][] = $card_html;
+                    }
+                }
+            }
+        } elseif ($master_cat_id > 0 && isset($category_sections[$master_cat_id])) {
+            foreach ($non_more_colls as $pt) {
+                if (isset($category_sections[$master_cat_id]['groups'][$pt->term_id])) {
+                    $category_sections[$master_cat_id]['groups'][$pt->term_id]['cards'][] = $card_html;
+                }
+            }
+        } else {
+            foreach ($non_more_colls as $pt) {
+                if (isset($fallback_groups[$pt->term_id])) {
+                    $fallback_groups[$pt->term_id]['cards'][] = $card_html;
+                }
+            }
+        }
+    }
+
+    $rendered_sections = [];
+    $active_fallback = [];
+    foreach ($fallback_groups as $g) {
+        if (!empty($g['cards'])) {
+            $active_fallback[] = $g;
+        }
+    }
+    if (!empty($active_fallback)) {
+        $rendered_sections[] = [
+            'slug'    => sanitize_title($master_heading),
+            'heading' => $master_heading,
+            'groups'  => $active_fallback,
+        ];
+    }
+    foreach ($category_sections as $sec) {
+        $active_groups = [];
+        foreach ($sec['groups'] as $g) {
+            if (!empty($g['cards'])) {
+                $active_groups[] = $g;
+            }
+        }
+        if (!empty($active_groups)) {
+            $rendered_sections[] = [
+                'slug'    => $sec['slug'],
+                'heading' => $sec['heading'],
+                'groups'  => $active_groups,
+            ];
+        }
+    }
+
+    if (empty($rendered_sections) && empty($more_gear_cards)) {
         return is_admin() ? '<p class="sv-small">No live products match this view.</p>' : '';
     }
 
+    static $scv_nav_instance = 0;
     ob_start();
     echo '<div class="scv-products-block scv-products-block--nav">';
-    if (!empty($master_groups)) {
-        $label_id = function_exists('wp_unique_id') ? wp_unique_id('scv-filter-label-') : 'scv-filter-label';
-        $default_slug = (string) $master_groups[0]['slug'];
-        echo '<div class="sv-master-section sv-inner" data-scv-collection-section>';
-        echo '<h2 class="wp-block-heading sv-collection-heading sv-master-heading">' . esc_html($master_heading) . '</h2>';
+    foreach ($rendered_sections as $sec) {
+        $scv_nav_instance++;
+        $label_id = function_exists('wp_unique_id')
+            ? wp_unique_id('scv-filter-label-')
+            : ('scv-filter-label-' . $scv_nav_instance);
+        $section_id = function_exists('wp_unique_id')
+            ? wp_unique_id('scv-cat-section-')
+            : ('scv-cat-section-' . $scv_nav_instance);
+        $sec_groups = $sec['groups'];
+        echo '<div class="sv-master-section sv-inner" id="' . esc_attr($section_id) . '" data-scv-collection-section data-scv-category="' . esc_attr($sec['slug']) . '">';
+        if ($sec['heading'] !== '') {
+            echo '<h2 class="wp-block-heading sv-collection-heading sv-master-heading">' . esc_html($sec['heading']) . '</h2>';
+        }
         echo '<div class="sv-filter-wrap" data-scv-filter-wrap>';
         echo '<p class="sv-filter-label" id="' . esc_attr($label_id) . '">' . esc_html($nav_label) . '</p>';
         echo '<div class="sv-filter-viewport" data-scv-filter-viewport>';
         echo '<div class="sv-filter-bar" role="radiogroup" aria-labelledby="' . esc_attr($label_id) . '" data-scv-filter-bar>';
-        foreach ($master_groups as $idx => $g) {
+        foreach ($sec_groups as $idx => $g) {
             $is_default = ($idx === 0);
             echo '<button type="button" class="sv-filter-pill' . ($is_default ? ' is-active' : '') . '" role="radio"'
                 . ' aria-checked="' . ($is_default ? 'true' : 'false') . '"'
@@ -1181,9 +1395,10 @@ function scv_products_render($attrs = []) {
         echo '<span class="sv-sr-only" aria-live="polite" data-scv-filter-status></span>';
         echo '</div>';
         echo '<div class="sv-collections-list" data-scv-collections-list>';
-        foreach ($master_groups as $idx => $g) {
+        foreach ($sec_groups as $idx => $g) {
             $is_default = ($idx === 0);
             echo '<div class="sv-collection-group"'
+                . ' id="' . esc_attr($section_id . '-' . $g['slug']) . '"'
                 . ' data-collection-group="' . esc_attr($g['slug']) . '"'
                 . ' data-collection-short="' . esc_attr($g['short_slug']) . '"'
                 . ' data-collection-count="' . (int) count($g['cards']) . '"'

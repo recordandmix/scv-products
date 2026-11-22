@@ -32,15 +32,15 @@
             PanelBody,
             { title: 'Display Settings', initialOpen: true },
             el(ToggleControl, {
-              label: 'Group collections under Sweatshirts & Hoodies with filter bar',
-              help: 'Shows one master section with collection filter pills above More Gear.',
+              label: 'Group by Category with collection filter bars',
+              help: 'Shows each Category section with collection filter pills above More Gear.',
               checked: !!attrs.collectionNav,
               onChange: function (val) {
                 props.setAttributes({ collectionNav: !!val });
               }
             }),
             attrs.collectionNav ? el(TextControl, {
-              label: 'Master section heading',
+              label: 'Fallback heading (for uncategorized items)',
               value: attrs.masterHeading,
               onChange: function (val) {
                 props.setAttributes({ masterHeading: val });

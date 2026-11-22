@@ -2,12 +2,16 @@
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.0.9
+Stable tag: 1.1.0
 License: GPL-2.0-or-later
 
-Custom Product catalog, Collections taxonomy, and Always Available product cards block for SoCal VoCals Swag.
+Custom Product catalog, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
 
 == Changelog ==
+
+= 1.1.0 =
+* Adds generic Categories taxonomy (`scv_category`) with display order (`_scv_category_order`), rendering per-category sections with scoped collection filter pills.
+* Moves the selected color label (`Color: ...`) onto its own line above wrapping swatch dots.
 
 = 1.0.9 =
 * Updater test release

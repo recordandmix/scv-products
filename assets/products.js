@@ -206,7 +206,7 @@
     return offset;
   }
 
-  function readRequestedCollection() {
+  function readRequestedCollection(sectionKey, multiSection) {
     try {
       if (window.location && window.location.search) {
         var params = new URLSearchParams(window.location.search);
@@ -215,14 +215,25 @@
       }
     } catch (e) {}
     if (window.location && window.location.hash) {
-      var h = window.location.hash.replace(/^#/, '').trim().toLowerCase();
-      if (h) return h;
+      var rawHash = window.location.hash.replace(/^#/, '').trim();
+      if (!rawHash) return '';
+      if (multiSection && rawHash.indexOf('=') !== -1) {
+        try {
+          var hp = new URLSearchParams(rawHash);
+          var scoped = hp.get(sectionKey);
+          return scoped ? scoped.trim().toLowerCase() : '';
+        } catch (e) {}
+      }
+      return rawHash.toLowerCase();
     }
     return '';
   }
 
   function initCollectionFilter() {
-    document.querySelectorAll('[data-scv-collection-section]').forEach(function (section) {
+    var allSections = Array.prototype.slice.call(document.querySelectorAll('[data-scv-collection-section]'));
+    var multiSection = allSections.length > 1;
+    allSections.forEach(function (section, secIndex) {
+      var sectionKey = section.getAttribute('data-scv-category') || ('section-' + (secIndex + 1));
       if (section._scvFilterReady) return;
       section._scvFilterReady = true;
 
@@ -357,7 +368,20 @@
         if (opts.updateUrl && window.history && window.history.replaceState) {
           try {
             var u = new URL(window.location.href);
-            if (isAll) {
+            var shortToken = isAll ? 'all' : (pill.getAttribute('data-collection-short') || targetSlug);
+            if (multiSection) {
+              if (u.searchParams.has('collection')) {
+                u.searchParams.delete('collection');
+              }
+              var rawH = (u.hash || '').replace(/^#/, '');
+              var hp = new URLSearchParams(rawH.indexOf('=') !== -1 ? rawH : '');
+              if (isAll) {
+                hp.set(sectionKey, 'all');
+              } else {
+                hp.set(sectionKey, shortToken);
+              }
+              u.hash = hp.toString();
+            } else if (isAll) {
               if (u.searchParams.has('collection')) {
                 u.searchParams.delete('collection');
               }
@@ -365,7 +389,6 @@
                 u.hash = '';
               }
             } else {
-              var shortToken = pill.getAttribute('data-collection-short') || targetSlug;
               if (u.searchParams.has('collection')) {
                 u.searchParams.set('collection', shortToken);
               } else {
@@ -421,15 +444,15 @@
         updateStuckState();
       }, { passive: true });
       window.addEventListener('hashchange', function () {
-        var req = readRequestedCollection();
-        var match = req ? findPill(req) : pills[0];
+        var req = readRequestedCollection(sectionKey, multiSection);
+        var match = req ? findPill(req) : (!multiSection || !window.location.hash ? pills[0] : null);
         if (match) {
           selectPill(match, { announce: true, updateUrl: false, preserveStickyScroll: false });
         }
       });
 
       syncStickyOffset();
-      var initialReq = readRequestedCollection();
+      var initialReq = readRequestedCollection(sectionKey, multiSection);
       var initialPill = initialReq ? findPill(initialReq) : null;
       if (initialPill) {
         selectPill(initialPill, { announce: false, updateUrl: false, instantPill: true });

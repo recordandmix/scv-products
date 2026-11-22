@@ -79,14 +79,16 @@
 }
 .sv-swatch-pick {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .55rem;
   margin: 1rem 0 0;
-  flex-wrap: wrap;
 }
 .sv-swatch-lab {
+  display: block;
+  width: 100%;
   font-size: .95rem;
+  line-height: 1.35;
   color: var(--sv-light, #DFE0E1);
 }
 .sv-swatch-lab b {
@@ -96,8 +98,9 @@
 .sv-swatch-dots {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  width: 100%;
 }
 .sv-swatch-dot {
   appearance: none;
@@ -358,6 +361,7 @@ body.sv-lightbox-on{overflow:hidden;}
 .sv-collections-list > .sv-collection-group[hidden] {
   display: none !important;
 }
+.sv-master-section + .sv-master-section,
 .sv-master-section + .sv-more-gear-group {
   margin-top: clamp(3rem, 6vw, 5rem);
 }
