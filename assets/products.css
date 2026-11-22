@@ -166,17 +166,45 @@
   pointer-events: none;
   z-index: 1;
 }
-.sv-shop-status {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+.sv-cta-slot {
+  display: inline-grid;
+  justify-items: stretch;
+  align-items: stretch;
+  max-width: 100%;
+}
+.sv-cta-slot > a,
+.sv-cta-slot > span {
+  grid-area: 1 / 1;
+  width: 100%;
+  box-sizing: border-box;
   margin: 0;
-  font-size: .95rem;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--sv-stone, #A8A6A1);
+  white-space: nowrap;
+}
+.sv-cta-slot.is-unavailable [data-swatch-shop],
+.sv-cta-slot.is-live [data-swatch-status] {
+  visibility: hidden;
   pointer-events: none;
+}
+.sv-shop-status,
+.sv-card span.wp-element-button.sv-shop-status {
+  background: #4a4a4d !important;
+  color: #c8c8c8 !important;
+  cursor: default !important;
+  pointer-events: none !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+  transform: none !important;
+  text-decoration: none !important;
+}
+.sv-shop-status:hover,
+.sv-card span.wp-element-button.sv-shop-status:hover,
+.sv-shop-status:active,
+.sv-card span.wp-element-button.sv-shop-status:active,
+.sv-shop-status:focus,
+.sv-card span.wp-element-button.sv-shop-status:focus {
+  background: #4a4a4d !important;
+  color: #c8c8c8 !important;
+  transform: none !important;
 }
 .sv-swatch-card .wp-block-buttons {
   margin-top: 1rem;

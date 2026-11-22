@@ -2,12 +2,15 @@
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPL-2.0-or-later
 
 Custom Product catalog, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
 
 == Changelog ==
+
+= 1.1.1 =
+* Sold out and Coming soon colors keep a greyed, non-clickable pill in the Shop button's place (SOLD OUT / COMING SOON), including on cards where every color is unavailable. Switching colors no longer shifts the card layout.
 
 = 1.1.0 =
 * Adds generic Categories taxonomy (`scv_category`) with display order (`_scv_category_order`), rendering per-category sections with scoped collection filter pills.

@@ -26,34 +26,62 @@
     return (data && data.provider) || 'Zazzle';
   }
 
+  function ensureCtaSlot(wrap) {
+    if (!wrap.classList.contains('sv-cta-slot')) {
+      wrap.classList.add('sv-cta-slot');
+    }
+    var a = wrap.querySelector('[data-swatch-shop]') || wrap.querySelector('a[data-swatch-btn]');
+    var statusEl = wrap.querySelector('[data-swatch-status]');
+    if (!a) {
+      a = document.createElement('a');
+      a.className = 'wp-block-button__link wp-element-button';
+      a.setAttribute('data-swatch-btn', '');
+      a.setAttribute('data-swatch-shop', '');
+      a.target = '_blank';
+      a.rel = 'noreferrer noopener';
+      wrap.insertBefore(a, wrap.firstChild);
+    } else if (!a.getAttribute('data-swatch-shop')) {
+      a.setAttribute('data-swatch-shop', '');
+    }
+    if (!statusEl) {
+      statusEl = document.createElement('span');
+      statusEl.className = 'wp-block-button__link wp-element-button sv-shop-status';
+      statusEl.setAttribute('data-swatch-status', '');
+      statusEl.setAttribute('aria-disabled', 'true');
+      wrap.appendChild(statusEl);
+    }
+    return { a: a, statusEl: statusEl };
+  }
+
   function setShopCta(card, item, data) {
     var wrap = card.querySelector('[data-swatch-cta]');
     if (!wrap) return;
+    var parts = ensureCtaSlot(wrap);
+    var a = parts.a;
+    var statusEl = parts.statusEl;
     if (isLiveColor(item)) {
-      var a = wrap.querySelector('a[data-swatch-btn]');
-      if (!a) {
-        wrap.textContent = '';
-        a = document.createElement('a');
-        a.className = 'wp-block-button__link wp-element-button';
-        a.setAttribute('data-swatch-btn', '');
-        a.target = '_blank';
-        a.rel = 'noreferrer noopener';
-        wrap.appendChild(a);
-      }
+      wrap.classList.add('is-live');
+      wrap.classList.remove('is-unavailable');
       if (item.url) {
         a.href = item.url;
       } else {
         a.removeAttribute('href');
       }
       a.textContent = 'Shop on ' + shopProvider(data, item);
+      a.removeAttribute('aria-hidden');
+      a.removeAttribute('tabindex');
+      statusEl.setAttribute('aria-hidden', 'true');
       return;
     }
-    wrap.textContent = '';
-    var span = document.createElement('span');
-    span.className = 'sv-shop-status';
-    span.setAttribute('data-swatch-btn', '');
-    span.textContent = item.status === 'coming_soon' ? 'Coming soon' : 'Sold out';
-    wrap.appendChild(span);
+    wrap.classList.remove('is-live');
+    wrap.classList.add('is-unavailable');
+    a.removeAttribute('href');
+    a.setAttribute('aria-hidden', 'true');
+    a.setAttribute('tabindex', '-1');
+    a.textContent = 'Shop on ' + shopProvider(data, item);
+    statusEl.textContent = item.status === 'coming_soon' ? 'COMING SOON' : 'SOLD OUT';
+    statusEl.removeAttribute('aria-hidden');
+    statusEl.setAttribute('aria-disabled', 'true');
   }
 
   function apply(card, key) {

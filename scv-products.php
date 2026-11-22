@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SCV Products
  * Description: Custom Product post type, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: SoCal VoCals Swag
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('SCV_PRODUCTS_VER', '1.1.0');
+define('SCV_PRODUCTS_VER', '1.1.1');
 define('SCV_PRODUCTS_PATH', plugin_dir_path(__FILE__));
 define('SCV_PRODUCTS_URL', plugin_dir_url(__FILE__));
 define(
@@ -808,6 +808,10 @@ function scv_products_unavailable_label($status) {
     return scv_products_normalize_status($status) === 'coming_soon' ? 'Coming soon' : 'Sold out';
 }
 
+function scv_products_unavailable_cta_label($status) {
+    return scv_products_normalize_status($status) === 'coming_soon' ? 'COMING SOON' : 'SOLD OUT';
+}
+
 function scv_products_unavailable_aria($status) {
     return scv_products_normalize_status($status) === 'coming_soon' ? 'coming soon' : 'sold out';
 }
@@ -834,16 +838,15 @@ function scv_products_card_status_badge($colors) {
 
 function scv_products_render_shop_cta($color, $product_provider) {
     $status = scv_products_normalize_status($color['status'] ?? 'live');
-    if ($status === 'live') {
-        $provider = scv_products_color_provider($color, $product_provider);
-        $url = (string) ($color['url'] ?? '');
-        ?>
-        <a class="wp-block-button__link wp-element-button" data-swatch-btn href="<?php echo esc_url($url); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html(scv_products_shop_label($provider)); ?></a>
-        <?php
-        return;
-    }
+    $is_live = ($status === 'live');
+    $provider = scv_products_color_provider($color, $product_provider);
+    $url = (string) ($color['url'] ?? '');
+    $slot_class = 'wp-block-button sv-cta-slot' . ($is_live ? ' is-live' : ' is-unavailable');
     ?>
-    <span class="sv-shop-status" data-swatch-btn><?php echo esc_html(scv_products_unavailable_label($status)); ?></span>
+    <div class="<?php echo esc_attr($slot_class); ?>" data-swatch-cta>
+        <a class="wp-block-button__link wp-element-button" data-swatch-btn data-swatch-shop<?php echo ($is_live && $url !== '') ? ' href="' . esc_url($url) . '"' : ''; ?> target="_blank" rel="noreferrer noopener"<?php echo $is_live ? '' : ' tabindex="-1" aria-hidden="true"'; ?>><?php echo esc_html(scv_products_shop_label($provider)); ?></a>
+        <span class="wp-block-button__link wp-element-button sv-shop-status" data-swatch-status aria-disabled="true"<?php echo $is_live ? ' aria-hidden="true"' : ''; ?>><?php echo esc_html($is_live ? 'SOLD OUT' : scv_products_unavailable_cta_label($status)); ?></span>
+    </div>
     <?php
 }
 
@@ -994,13 +997,9 @@ function scv_products_render_card($post, $show_count_pill = true) {
                 <?php if ($has_any_order_by) : ?>
                     <p class="sv-order-by sv-small" data-swatch-orderby<?php echo $first['orderByText'] === '' ? ' hidden' : ''; ?>><?php echo esc_html($first['orderByText']); ?></p>
                 <?php endif; ?>
-                <?php if ($has_any_live) : ?>
                 <div class="wp-block-buttons">
-                    <div class="wp-block-button" data-swatch-cta>
-                        <?php scv_products_render_shop_cta($first, $provider); ?>
-                    </div>
+                    <?php scv_products_render_shop_cta($first, $provider); ?>
                 </div>
-                <?php endif; ?>
             </div>
             <script type="application/json" class="sv-swatch-data"><?php echo wp_json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES); ?></script>
         </div>
@@ -1030,13 +1029,9 @@ function scv_products_render_card($post, $show_count_pill = true) {
                 <?php if ($first['orderByText'] !== '') : ?>
                     <p class="sv-order-by sv-small"><?php echo esc_html($first['orderByText']); ?></p>
                 <?php endif; ?>
-                <?php if ($has_any_live) : ?>
                 <div class="wp-block-buttons">
-                    <div class="wp-block-button">
-                        <?php scv_products_render_shop_cta($first, $provider); ?>
-                    </div>
+                    <?php scv_products_render_shop_cta($first, $provider); ?>
                 </div>
-                <?php endif; ?>
             </div>
         </div>
         <?php
