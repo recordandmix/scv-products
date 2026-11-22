@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SCV Products
  * Description: Custom Product post type, Collections taxonomy, and Always Available product cards block for SoCal VoCals Swag.
- * Version: 1.0.8
+ * Version: 1.0.9
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: SoCal VoCals Swag
@@ -13,7 +13,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('SCV_PRODUCTS_VER', '1.0.8');
+define('SCV_PRODUCTS_VER', '1.0.9');
+// Updater test release.
 define('SCV_PRODUCTS_PATH', plugin_dir_path(__FILE__));
 define('SCV_PRODUCTS_URL', plugin_dir_url(__FILE__));
 define(

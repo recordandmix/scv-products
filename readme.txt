@@ -2,12 +2,15 @@
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.0.8
+Stable tag: 1.0.9
 License: GPL-2.0-or-later
 
 Custom Product catalog, Collections taxonomy, and Always Available product cards block for SoCal VoCals Swag.
 
 == Changelog ==
+
+= 1.0.9 =
+* Updater test release
 
 = 1.0.8 =
 * Adds a GitHub-backed update checker. After this version is installed, new releases appear under Dashboard > Updates. Click Check again, then Update, or turn on auto-updates for the plugin.
