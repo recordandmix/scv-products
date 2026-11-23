@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SCV Products
  * Description: Custom Product post type, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: SoCal VoCals Swag
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('SCV_PRODUCTS_VER', '1.1.1');
+define('SCV_PRODUCTS_VER', '1.1.2');
 define('SCV_PRODUCTS_PATH', plugin_dir_path(__FILE__));
 define('SCV_PRODUCTS_URL', plugin_dir_url(__FILE__));
 define(
@@ -179,6 +179,15 @@ function scv_products_register_types() {
         'single'            => true,
         'default'           => '',
         'sanitize_callback' => 'sanitize_text_field',
+        'auth_callback'     => $auth_edit,
+        'show_in_rest'      => true,
+    ]);
+
+    register_post_meta('scv_product', '_scv_default_color', [
+        'type'              => 'string',
+        'single'            => true,
+        'default'           => '',
+        'sanitize_callback' => 'sanitize_key',
         'auth_callback'     => $auth_edit,
         'show_in_rest'      => true,
     ]);
@@ -493,6 +502,31 @@ function scv_products_render_details_box($post) {
             <p class="scv-admin-help">Lower numbers appear first within the collection.</p>
         </div>
         <div class="scv-admin-field">
+            <label for="scv-default-color">Default color</label>
+            <select id="scv-default-color" name="scv_default_color">
+                <option value="">First live color</option>
+                <?php
+                $default_color = (string) get_post_meta($post->ID, '_scv_default_color', true);
+                $default_color_rows = get_post_meta($post->ID, '_scv_colors', true);
+                if (!is_array($default_color_rows)) {
+                    $default_color_rows = [];
+                }
+                foreach ($default_color_rows as $row) {
+                    $k = sanitize_key((string) ($row['key'] ?? ''));
+                    if ($k === '') {
+                        continue;
+                    }
+                    $lab = (string) ($row['label'] ?? '');
+                    if ($lab === '') {
+                        $lab = $k;
+                    }
+                    echo '<option value="' . esc_attr($k) . '"' . selected($default_color, $k, false) . '>' . esc_html($lab) . '</option>';
+                }
+                ?>
+            </select>
+            <p class="scv-admin-help">Shown first on the card (photo, label, and shop button). Swatch order is unchanged. If this color is missing, sold out, or coming soon, the first live color is used.</p>
+        </div>
+        <div class="scv-admin-field">
             <label for="scv-swatch-aria">Color Picker Aria Label (optional)</label>
             <input type="text" id="scv-swatch-aria" name="scv_swatch_aria_label" value="<?php echo esc_attr($aria_label); ?>" placeholder="e.g. Sweatshirt color">
             <p class="scv-admin-help">Defaults to &ldquo;[Product Title] color&rdquo; if blank.</p>
@@ -659,6 +693,7 @@ add_action('save_post_scv_product', function ($post_id) {
     update_post_meta($post_id, '_scv_sort_order', (int) ($_POST['scv_sort_order'] ?? 10));
     update_post_meta($post_id, '_scv_swatch_aria_label', sanitize_text_field(wp_unslash($_POST['scv_swatch_aria_label'] ?? '')));
     update_post_meta($post_id, '_scv_hide_swatches', !empty($_POST['scv_hide_swatches']) ? true : false);
+    update_post_meta($post_id, '_scv_default_color', sanitize_key(wp_unslash($_POST['scv_default_color'] ?? '')));
 
     $raw_colors = isset($_POST['scv_colors']) && is_array($_POST['scv_colors']) ? wp_unslash($_POST['scv_colors']) : [];
     update_post_meta($post_id, '_scv_colors', scv_products_sanitize_colors($raw_colors));
@@ -791,6 +826,28 @@ function scv_products_is_live_status($status) {
     return scv_products_normalize_status($status) === 'live';
 }
 
+
+function scv_products_pick_initial_color($colors, $default_key = '') {
+    if (!is_array($colors) || $colors === []) {
+        return null;
+    }
+    $default_key = (string) $default_key;
+    if ($default_key !== '') {
+        foreach ($colors as $c) {
+            if ((string) ($c['key'] ?? '') === $default_key && scv_products_is_live_status($c['status'] ?? 'live')) {
+                return $c;
+            }
+        }
+    }
+    foreach ($colors as $c) {
+        if (scv_products_is_live_status($c['status'] ?? 'live')) {
+            return $c;
+        }
+    }
+    return $colors[0];
+}
+
+
 function scv_products_color_provider($color, $product_provider) {
     $from_color = trim((string) ($color['provider'] ?? ''));
     if ($from_color !== '') {
@@ -903,12 +960,10 @@ function scv_products_render_card($post, $show_count_pill = true) {
         return '';
     }
 
-    $first = $colors[0];
-    foreach ($colors as $c) {
-        if (scv_products_is_live_status($c['status'])) {
-            $first = $c;
-            break;
-        }
+    $default_key = (string) get_post_meta($pid, '_scv_default_color', true);
+    $first = scv_products_pick_initial_color($colors, $default_key);
+    if (!$first) {
+        return '';
     }
 
     $has_any_live = false;
@@ -940,11 +995,12 @@ function scv_products_render_card($post, $show_count_pill = true) {
         }
         $alt = $first['label'] !== '' ? ($title . ' in ' . $first['label']) : $title;
         $payload = [
-            'id'       => $post->post_name,
-            'title'    => $title,
-            'provider' => $provider,
-            'hero'     => $first['key'],
-            'colors'   => $colors,
+            'id'           => $post->post_name,
+            'title'        => $title,
+            'provider'     => $provider,
+            'defaultColor' => $default_key,
+            'hero'         => $first['key'],
+            'colors'       => $colors,
         ];
         ?>
         <div class="<?php echo esc_attr($card_classes); ?>" data-swatch-card>
@@ -1067,6 +1123,18 @@ function scv_products_parse_bool_attr($val, $default = false) {
         }
     }
     return $default;
+}
+
+
+function scv_products_category_matches_master($term, $master_heading) {
+    $heading = trim(html_entity_decode((string) $master_heading, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    $name = trim(html_entity_decode((string) ($term->name ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    if ($heading !== '' && strcasecmp($name, $heading) === 0) {
+        return true;
+    }
+    $heading_slug = sanitize_title($heading);
+    $term_slug = (string) ($term->slug ?? '');
+    return $heading_slug !== '' && $term_slug !== '' && $term_slug === $heading_slug;
 }
 
 function scv_products_render($attrs = []) {
@@ -1246,7 +1314,7 @@ function scv_products_render($attrs = []) {
             'heading' => (string) $ct->name,
             'groups'  => $cat_groups,
         ];
-        if ($master_cat_id === 0 && strcasecmp(trim((string) $ct->name), trim($master_heading)) === 0) {
+        if ($master_cat_id === 0 && scv_products_category_matches_master($ct, $master_heading)) {
             $master_cat_id = (int) $ct->term_id;
         }
     }

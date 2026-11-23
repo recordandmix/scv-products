@@ -137,6 +137,9 @@
       var data = parseData(card);
       if (!data) return;
       card._swatch = data;
+      if (data.hero) {
+        apply(card, data.hero);
+      }
       card.addEventListener('click', function (e) {
         var t = e.target.closest ? e.target.closest('[data-color-key]') : null;
         if (!t) return;

@@ -2,12 +2,16 @@
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.1.2
 License: GPL-2.0-or-later
 
 Custom Product catalog, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
 
 == Changelog ==
+
+= 1.1.2 =
+* Category sections now match the master heading after decoding HTML entities, and also by slug, so uncategorized collected products merge into the existing Sweatshirts & Hoodies section instead of duplicating that heading.
+* Products can set a default color (`_scv_default_color`). The card opens on that swatch (photo, label, shop link, and CTA) without changing swatch order. If the default is missing, invalid, sold out, or coming soon, the first live color is used instead.
 
 = 1.1.1 =
 * Sold out and Coming soon colors keep a greyed, non-clickable pill in the Shop button's place (SOLD OUT / COMING SOON), including on cards where every color is unavailable. Switching colors no longer shifts the card layout.
