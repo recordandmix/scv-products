@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SCV Products
  * Description: Custom Product post type, Categories and Collections taxonomies, and Always Available product cards block for SoCal VoCals Swag.
- * Version: 1.1.2
+ * Version: 1.1.3
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: SoCal VoCals Swag
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('SCV_PRODUCTS_VER', '1.1.2');
+define('SCV_PRODUCTS_VER', '1.1.3');
 define('SCV_PRODUCTS_PATH', plugin_dir_path(__FILE__));
 define('SCV_PRODUCTS_URL', plugin_dir_url(__FILE__));
 define(
@@ -142,6 +142,15 @@ function scv_products_register_types() {
         'type'              => 'string',
         'single'            => true,
         'default'           => 'Zazzle',
+        'sanitize_callback' => 'sanitize_text_field',
+        'auth_callback'     => $auth_edit,
+        'show_in_rest'      => true,
+    ]);
+
+    register_post_meta('scv_product', '_scv_cta_label', [
+        'type'              => 'string',
+        'single'            => true,
+        'default'           => '',
         'sanitize_callback' => 'sanitize_text_field',
         'auth_callback'     => $auth_edit,
         'show_in_rest'      => true,
@@ -460,6 +469,7 @@ function scv_products_render_details_box($post) {
     if ($provider === '') {
         $provider = 'Zazzle';
     }
+    $cta_label = (string) get_post_meta($post->ID, '_scv_cta_label', true);
     $short_desc = get_post_meta($post->ID, '_scv_short_desc', true);
     $sort_order = get_post_meta($post->ID, '_scv_sort_order', true);
     if ($sort_order === '') {
@@ -490,6 +500,11 @@ function scv_products_render_details_box($post) {
                 <option value="CustomInk"></option>
             </datalist>
             <p class="scv-admin-help">Used in the button text, e.g. <em>Shop on Zazzle</em>. A color can override this.</p>
+        </div>
+        <div class="scv-admin-field">
+            <label for="scv-cta-label">Shop button label (optional)</label>
+            <input type="text" id="scv-cta-label" name="scv_cta_label" value="<?php echo esc_attr($cta_label); ?>" placeholder="Shop on Zazzle">
+            <p class="scv-admin-help">If set, the red shop button uses this label instead of &ldquo;Shop on [Provider]&rdquo;. Leave blank for the default. Color changes will not overwrite it.</p>
         </div>
         <div class="scv-admin-field scv-field-full">
             <label for="scv-short-desc">Short Description</label>
@@ -689,6 +704,7 @@ add_action('save_post_scv_product', function ($post_id) {
     update_post_meta($post_id, '_scv_garment', sanitize_text_field(wp_unslash($_POST['scv_garment'] ?? '')));
     $provider = sanitize_text_field(wp_unslash($_POST['scv_provider'] ?? ''));
     update_post_meta($post_id, '_scv_provider', $provider !== '' ? $provider : 'Zazzle');
+    update_post_meta($post_id, '_scv_cta_label', sanitize_text_field(wp_unslash($_POST['scv_cta_label'] ?? '')));
     update_post_meta($post_id, '_scv_short_desc', sanitize_textarea_field(wp_unslash($_POST['scv_short_desc'] ?? '')));
     update_post_meta($post_id, '_scv_sort_order', (int) ($_POST['scv_sort_order'] ?? 10));
     update_post_meta($post_id, '_scv_swatch_aria_label', sanitize_text_field(wp_unslash($_POST['scv_swatch_aria_label'] ?? '')));
@@ -857,7 +873,11 @@ function scv_products_color_provider($color, $product_provider) {
     return $from_product !== '' ? $from_product : 'Zazzle';
 }
 
-function scv_products_shop_label($provider) {
+function scv_products_shop_label($provider, $cta_label = '') {
+    $custom = trim((string) $cta_label);
+    if ($custom !== '') {
+        return $custom;
+    }
     return 'Shop on ' . $provider;
 }
 
@@ -893,7 +913,7 @@ function scv_products_card_status_badge($colors) {
     return $all_coming_soon ? 'Coming soon' : 'Sold out';
 }
 
-function scv_products_render_shop_cta($color, $product_provider) {
+function scv_products_render_shop_cta($color, $product_provider, $cta_label = '') {
     $status = scv_products_normalize_status($color['status'] ?? 'live');
     $is_live = ($status === 'live');
     $provider = scv_products_color_provider($color, $product_provider);
@@ -901,7 +921,7 @@ function scv_products_render_shop_cta($color, $product_provider) {
     $slot_class = 'wp-block-button sv-cta-slot' . ($is_live ? ' is-live' : ' is-unavailable');
     ?>
     <div class="<?php echo esc_attr($slot_class); ?>" data-swatch-cta>
-        <a class="wp-block-button__link wp-element-button" data-swatch-btn data-swatch-shop<?php echo ($is_live && $url !== '') ? ' href="' . esc_url($url) . '"' : ''; ?> target="_blank" rel="noreferrer noopener"<?php echo $is_live ? '' : ' tabindex="-1" aria-hidden="true"'; ?>><?php echo esc_html(scv_products_shop_label($provider)); ?></a>
+        <a class="wp-block-button__link wp-element-button" data-swatch-btn data-swatch-shop<?php echo ($is_live && $url !== '') ? ' href="' . esc_url($url) . '"' : ''; ?> target="_blank" rel="noreferrer noopener"<?php echo $is_live ? '' : ' tabindex="-1" aria-hidden="true"'; ?>><?php echo esc_html(scv_products_shop_label($provider, $cta_label)); ?></a>
         <span class="wp-block-button__link wp-element-button sv-shop-status" data-swatch-status aria-disabled="true"<?php echo $is_live ? ' aria-hidden="true"' : ''; ?>><?php echo esc_html($is_live ? 'SOLD OUT' : scv_products_unavailable_cta_label($status)); ?></span>
     </div>
     <?php
@@ -916,6 +936,7 @@ function scv_products_render_card($post, $show_count_pill = true) {
         $provider = 'Zazzle';
     }
     $short_desc = (string) get_post_meta($pid, '_scv_short_desc', true);
+    $cta_label = trim((string) get_post_meta($pid, '_scv_cta_label', true));
     $hide_swatches = (bool) get_post_meta($pid, '_scv_hide_swatches', true);
     $aria_label = (string) get_post_meta($pid, '_scv_swatch_aria_label', true);
     if ($aria_label === '') {
@@ -998,6 +1019,7 @@ function scv_products_render_card($post, $show_count_pill = true) {
             'id'           => $post->post_name,
             'title'        => $title,
             'provider'     => $provider,
+            'ctaLabel'     => $cta_label,
             'defaultColor' => $default_key,
             'hero'         => $first['key'],
             'colors'       => $colors,
@@ -1054,7 +1076,7 @@ function scv_products_render_card($post, $show_count_pill = true) {
                     <p class="sv-order-by sv-small" data-swatch-orderby<?php echo $first['orderByText'] === '' ? ' hidden' : ''; ?>><?php echo esc_html($first['orderByText']); ?></p>
                 <?php endif; ?>
                 <div class="wp-block-buttons">
-                    <?php scv_products_render_shop_cta($first, $provider); ?>
+                    <?php scv_products_render_shop_cta($first, $provider, $cta_label); ?>
                 </div>
             </div>
             <script type="application/json" class="sv-swatch-data"><?php echo wp_json_encode($payload, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES); ?></script>
@@ -1086,7 +1108,7 @@ function scv_products_render_card($post, $show_count_pill = true) {
                     <p class="sv-order-by sv-small"><?php echo esc_html($first['orderByText']); ?></p>
                 <?php endif; ?>
                 <div class="wp-block-buttons">
-                    <?php scv_products_render_shop_cta($first, $provider); ?>
+                    <?php scv_products_render_shop_cta($first, $provider, $cta_label); ?>
                 </div>
             </div>
         </div>

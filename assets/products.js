@@ -26,6 +26,12 @@
     return (data && data.provider) || 'Zazzle';
   }
 
+  function shopLabel(data, item) {
+    var custom = data && data.ctaLabel != null ? String(data.ctaLabel).trim() : '';
+    if (custom) return custom;
+    return 'Shop on ' + shopProvider(data, item);
+  }
+
   function ensureCtaSlot(wrap) {
     if (!wrap.classList.contains('sv-cta-slot')) {
       wrap.classList.add('sv-cta-slot');
@@ -67,7 +73,7 @@
       } else {
         a.removeAttribute('href');
       }
-      a.textContent = 'Shop on ' + shopProvider(data, item);
+      a.textContent = shopLabel(data, item);
       a.removeAttribute('aria-hidden');
       a.removeAttribute('tabindex');
       statusEl.setAttribute('aria-hidden', 'true');
@@ -78,7 +84,7 @@
     a.removeAttribute('href');
     a.setAttribute('aria-hidden', 'true');
     a.setAttribute('tabindex', '-1');
-    a.textContent = 'Shop on ' + shopProvider(data, item);
+    a.textContent = shopLabel(data, item);
     statusEl.textContent = item.status === 'coming_soon' ? 'COMING SOON' : 'SOLD OUT';
     statusEl.removeAttribute('aria-hidden');
     statusEl.setAttribute('aria-disabled', 'true');
